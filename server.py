@@ -1,10 +1,9 @@
 """
 MogMatch — server.py
-FastAPI + WebSockets server. Replaces index.js entirely.
-No Node.js required.
+FastAPI + WebSockets. No Node required.
 
 Run:
-    uvicorn server:app --host 0.0.0.0 --port 3000 --reload
+    uvicorn server:app --host 0.0.0.0 --port 3000
 """
 
 import asyncio
@@ -13,12 +12,13 @@ import json
 import random
 import uuid
 from collections import deque
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# ── Optional DeepFace ────────────────────────────────────────
 try:
     from deepface import DeepFace
     import cv2
@@ -30,22 +30,38 @@ except ImportError:
 # ────────────────────────────────────────────────────────────
 app = FastAPI()
 
-# Serve frontend static files (index.html, style.css, script.js)
-app.mount("/static", StaticFiles(directory=".", html=True), name="static")
+HERE = Path(__file__).parent
+
+# Serve static assets (css, js) — but NOT index.html via mount
+# so we can handle the root route manually
+app.mount("/static", StaticFiles(directory=str(HERE)), name="static")
+
+@app.get("/")
+async def root():
+    return FileResponse(str(HERE / "index.html"))
+
+# Also serve css/js directly from root (script.js, style.css)
+@app.get("/{filename}")
+async def static_file(filename: str):
+    path = HERE / filename
+    if path.exists() and path.suffix in {".css", ".js", ".html", ".ico", ".png"}:
+        return FileResponse(str(path))
+    from fastapi import HTTPException
+    raise HTTPException(404)
 
 # ────────────────────────────────────────────────────────────
-# STATE
+# MATCHMAKING STATE
 # ────────────────────────────────────────────────────────────
 queue: deque[WebSocket] = deque()
 
 class Room:
     def __init__(self, room_id: str, members: List[WebSocket]):
-        self.room_id  = room_id
-        self.members  = members          # [ws1, ws2]
-        self.frames:  Dict[int, str] = {}  # id(ws) -> b64 frame
+        self.room_id = room_id
+        self.members = members
+        self.frames: Dict[int, str] = {}
 
 rooms: Dict[str, Room] = {}
-ws_to_room: Dict[int, str] = {}          # id(ws) -> room_id
+ws_to_room: Dict[int, str] = {}
 
 # ────────────────────────────────────────────────────────────
 # HELPERS
@@ -77,7 +93,7 @@ async def leave_room(ws: WebSocket):
     del rooms[rid]
 
 # ────────────────────────────────────────────────────────────
-# AI SCORING
+# SCORING
 # ────────────────────────────────────────────────────────────
 def compute_score(analysis: dict) -> float:
     base = 5.0
@@ -86,20 +102,15 @@ def compute_score(analysis: dict) -> float:
         "surprise": 0.0, "sad": -0.8, "fear": -1.0,
         "angry": -0.5, "disgust": -0.8,
     }
-    emotion = analysis.get("dominant_emotion", "neutral").lower()
-    base += emotion_map.get(emotion, 0.0)
-
+    base += emotion_map.get(analysis.get("dominant_emotion", "neutral").lower(), 0.0)
     age = analysis.get("age", 25)
     if   18 <= age <= 28: base += 0.8
     elif 28 <  age <= 35: base += 0.4
-    elif 35 <  age <= 45: base += 0.0
-    else:                 base -= 0.4
-
+    elif age > 45:        base -= 0.4
     region = analysis.get("region", {})
     area = region.get("w", 0) * region.get("h", 0)
     if area > 40000:   base += 0.5
     elif area > 20000: base += 0.2
-
     base += random.gauss(0, 0.6)
     return round(max(0.0, min(10.0, base)), 2)
 
@@ -108,16 +119,12 @@ def score_frame(b64: str) -> float:
         return rand_score()
     try:
         img_bytes = base64.b64decode(b64)
-        np_arr    = np.frombuffer(img_bytes, np.uint8)
-        img       = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         if img is None:
             return rand_score()
-        result = DeepFace.analyze(
-            img_path=img,
-            actions=["age", "emotion"],
-            enforce_detection=False,
-            silent=True,
-        )
+        result = DeepFace.analyze(img_path=img, actions=["age", "emotion"],
+                                  enforce_detection=False, silent=True)
         if isinstance(result, list):
             result = result[0]
         return compute_score(result)
@@ -128,14 +135,11 @@ async def score_and_broadcast(room: Room):
     ws1, ws2 = room.members
     b64_1 = room.frames.get(id(ws1), "")
     b64_2 = room.frames.get(id(ws2), "")
-
-    # Run blocking DeepFace in thread pool
     loop = asyncio.get_event_loop()
     s1, s2 = await asyncio.gather(
         loop.run_in_executor(None, score_frame, b64_1),
         loop.run_in_executor(None, score_frame, b64_2),
     )
-
     await send(ws1, {"type": "scores", "yourScore": s1, "oppScore": s2})
     await send(ws2, {"type": "scores", "yourScore": s2, "oppScore": s1})
 
@@ -151,30 +155,38 @@ async def websocket_endpoint(ws: WebSocket):
             msg  = json.loads(raw)
             kind = msg.get("type")
 
-            # ── Find match ──────────────────────────────────
             if kind == "find_match":
                 await leave_room(ws)
+                # Remove self from queue if already in it
+                try:
+                    queue.remove(ws)
+                except ValueError:
+                    pass
 
-                # Remove stale entries from queue
-                stale = [q for q in queue if q is ws]
-                for s in stale:
-                    queue.remove(s)
+                # Find a live partner from queue
+                partner = None
+                while queue:
+                    candidate = queue.popleft()
+                    try:
+                        # Check connection is still open
+                        await candidate.send_text('{"type":"ping"}')
+                        partner = candidate
+                        break
+                    except Exception:
+                        ws_to_room.pop(id(candidate), None)
 
-                if queue:
-                    partner = queue.popleft()
+                if partner:
                     room_id = str(uuid.uuid4())[:8]
-                    room    = Room(room_id, [ws, partner])
-                    rooms[room_id]    = room
+                    room = Room(room_id, [ws, partner])
+                    rooms[room_id] = room
                     ws_to_room[id(ws)]      = room_id
                     ws_to_room[id(partner)] = room_id
-
                     await send(ws,      {"type": "matched", "room": room_id, "initiator": True})
                     await send(partner, {"type": "matched", "room": room_id, "initiator": False})
                 else:
                     queue.append(ws)
                     await send(ws, {"type": "status", "msg": "In queue..."})
 
-            # ── WebRTC signal passthrough ────────────────────
             elif kind == "signal":
                 rid = ws_to_room.get(id(ws))
                 if rid and rid in rooms:
@@ -186,7 +198,6 @@ async def websocket_endpoint(ws: WebSocket):
                             "candidate": msg.get("candidate"),
                         })
 
-            # ── Frame for AI analysis ────────────────────────
             elif kind == "analyze_frame":
                 rid = ws_to_room.get(id(ws))
                 if rid and rid in rooms:
@@ -195,11 +206,13 @@ async def websocket_endpoint(ws: WebSocket):
                     if len(room.frames) >= 2:
                         asyncio.create_task(score_and_broadcast(room))
 
-            # ── Skip ────────────────────────────────────────
             elif kind == "skip":
                 await leave_room(ws)
                 queue.append(ws)
                 await send(ws, {"type": "status", "msg": "In queue..."})
+
+            elif kind == "ping":
+                pass  # ignore pings sent by server to check liveness
 
     except WebSocketDisconnect:
         await leave_room(ws)
@@ -209,3 +222,7 @@ async def websocket_endpoint(ws: WebSocket):
             pass
     except Exception:
         await leave_room(ws)
+        try:
+            queue.remove(ws)
+        except ValueError:
+            pass
