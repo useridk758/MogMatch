@@ -3,7 +3,7 @@
  * Uses native WebSocket — no Socket.IO, no Node required.
  */
 
-const WS_URL        = `ws://${location.host}/ws`;
+const WS_URL        = `ws://${location.hostname}:${location.port || 3000}/ws`;
 const ROUND_SECONDS = 30;
 const SCAN_DELAY_MS = 4000;
 
