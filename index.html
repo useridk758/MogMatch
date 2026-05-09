@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MogMatch — Face the Verdict</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="noise-overlay"></div>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="screen active">
+    <div class="logo-block">
+      <h1 class="logo">MOG<span>MATCH</span></h1>
+      <p class="tagline">Anonymous face ranking. No cap.</p>
+    </div>
+    <div class="tier-legend">
+      <div class="tier-item" data-tier="sub3"><span class="tier-score">0–3</span><span class="tier-label">Sub-3</span></div>
+      <div class="tier-item" data-tier="sub5"><span class="tier-score">3–5</span><span class="tier-label">Sub-5</span></div>
+      <div class="tier-item" data-tier="ltn"><span class="tier-score">5–6</span><span class="tier-label">LTN</span></div>
+      <div class="tier-item" data-tier="mtn"><span class="tier-score">6–7</span><span class="tier-label">MTN</span></div>
+      <div class="tier-item" data-tier="htn"><span class="tier-score">7–8</span><span class="tier-label">HTN</span></div>
+      <div class="tier-item" data-tier="chadlite"><span class="tier-score">8–9</span><span class="tier-label">Chad-Lite</span></div>
+      <div class="tier-item" data-tier="chad"><span class="tier-score">9–10</span><span class="tier-label">Chad</span></div>
+    </div>
+    <button id="start-btn" class="cta-btn">Enter the Arena</button>
+    <p class="disclaimer">Camera access required. 18+ only. Results are AI-generated and not medical/personal advice.</p>
+  </div>
+
+  <!-- ARENA -->
+  <div id="arena" class="screen">
+    <header class="arena-header">
+      <span class="logo-sm">MOGMATCH</span>
+      <div id="status-bar">
+        <span id="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+      <div class="round-info">
+        <span id="round-label">ROUND</span>
+        <div class="timer-ring">
+          <svg viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="26" class="ring-bg"/>
+            <circle cx="30" cy="30" r="26" class="ring-fill" id="timer-ring"/>
+          </svg>
+          <span id="timer-num">30</span>
+        </div>
+      </div>
+      <button id="skip-btn" class="skip-btn">Skip ›</button>
+    </header>
+
+    <div class="cam-grid">
+
+      <!-- YOU -->
+      <div class="cam-card" id="cam-you">
+        <video id="local-video" autoplay muted playsinline></video>
+        <canvas id="local-canvas"></canvas>
+
+        <!-- everything layered inside the card -->
+        <div class="cam-overlay">
+          <div class="cam-label">YOU</div>
+
+          <!-- score sits at bottom-right of overlay -->
+          <div class="score-badge">
+            <div class="score-num" id="your-score">—</div>
+            <div class="score-tier" id="your-tier">Scanning...</div>
+            <!-- bar lives INSIDE the overlay, bottom of badge -->
+            <div class="score-bar-track">
+              <div class="score-bar-fill" id="your-bar"></div>
+              <div class="score-ticks">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPPONENT -->
+      <div class="cam-card" id="cam-opp">
+        <video id="remote-video" autoplay playsinline></video>
+        <canvas id="remote-canvas"></canvas>
+
+        <div class="waiting-overlay" id="waiting-overlay">
+          <div class="spinner"></div>
+          <p>Finding opponent...</p>
+        </div>
+
+        <div class="cam-overlay">
+          <div class="cam-label">OPPONENT</div>
+
+          <div class="score-badge">
+            <div class="score-num" id="opp-score">—</div>
+            <div class="score-tier" id="opp-tier">Waiting...</div>
+            <div class="score-bar-track">
+              <div class="score-bar-fill" id="opp-bar"></div>
+              <div class="score-ticks">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- VERDICT -->
+    <div id="verdict-banner" class="verdict-banner hidden">
+      <div class="verdict-inner">
+        <span id="verdict-icon">🏆</span>
+        <span id="verdict-text">Loading verdict...</span>
+      </div>
+    </div>
+
+
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
