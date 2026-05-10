@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MogMatch — Face the Verdict</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="noise-overlay"></div>
+  <div id="scanline-overlay"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       LOBBY SCREEN
+  ════════════════════════════════════════════════════ -->
+  <div id="screen-lobby" class="screen active">
+    <div class="lobby-bg-glow"></div>
+
+    <nav class="lobby-nav">
+      <span class="logo-text">MOG<span class="logo-accent">MATCH</span></span>
+      <button class="nav-btn" id="btn-open-leaderboard">🏆 Leaderboard</button>
+    </nav>
+
+    <div class="lobby-center">
+      <div class="lobby-hero">
+        <div class="hero-eyebrow">AI-Powered Face Rating</div>
+        <h1 class="hero-title">MOG<br><span class="hero-accent">MATCH</span></h1>
+        <p class="hero-sub">Two strangers. One webcam each. The AI decides who's built different.</p>
+      </div>
+
+      <div class="tier-showcase">
+        <div class="tier-showcase-label">PSL TIER SCALE</div>
+        <div class="tier-cards">
+          <div class="tier-card" data-tier="sub3">
+            <div class="tc-range">0 – 3</div>
+            <div class="tc-name">Sub-3</div>
+            <div class="tc-bar" style="width:30%"></div>
+          </div>
+          <div class="tier-card" data-tier="sub5">
+            <div class="tc-range">3 – 5</div>
+            <div class="tc-name">Sub-5</div>
+            <div class="tc-bar" style="width:50%"></div>
+          </div>
+          <div class="tier-card" data-tier="ltn">
+            <div class="tc-range">5 – 6</div>
+            <div class="tc-name">LTN</div>
+            <div class="tc-bar" style="width:60%"></div>
+          </div>
+          <div class="tier-card" data-tier="mtn">
+            <div class="tc-range">6 – 7</div>
+            <div class="tc-name">MTN</div>
+            <div class="tc-bar" style="width:70%"></div>
+          </div>
+          <div class="tier-card" data-tier="htn">
+            <div class="tc-range">7 – 8</div>
+            <div class="tc-name">HTN</div>
+            <div class="tc-bar" style="width:80%"></div>
+          </div>
+          <div class="tier-card" data-tier="chadlite">
+            <div class="tc-range">8 – 9</div>
+            <div class="tc-name">Chad-Lite</div>
+            <div class="tc-bar" style="width:90%"></div>
+          </div>
+          <div class="tier-card" data-tier="chad">
+            <div class="tc-range">9 – 10</div>
+            <div class="tc-name">Chad</div>
+            <div class="tc-bar" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lobby-actions">
+        <button class="btn-primary" id="btn-enter-arena">
+          <span class="btn-icon">⚔️</span>
+          <span>Enter the Arena</span>
+        </button>
+        <button class="btn-secondary" id="btn-solo-rate">
+          <span class="btn-icon">🪞</span>
+          <span>Rate Myself Solo</span>
+        </button>
+      </div>
+
+      <p class="lobby-disclaimer">Camera required · 18+ · AI scores are entertainment only · No data stored</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       ARENA SCREEN
+  ════════════════════════════════════════════════════ -->
+  <div id="screen-arena" class="screen">
+    <!-- Header bar -->
+    <header class="arena-header">
+      <button class="hdr-btn" id="btn-back-lobby">← Exit</button>
+
+      <div class="hdr-center">
+        <span class="logo-text-sm">MOGMATCH</span>
+        <div id="status-pill" class="status-pill searching">
+          <span class="status-dot"></span>
+          <span id="status-label">Connecting...</span>
+        </div>
+      </div>
+
+      <div class="hdr-right">
+        <!-- Timer ring -->
+        <div class="timer-wrap" id="timer-wrap">
+          <svg class="timer-svg" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="18" class="timer-track"/>
+            <circle cx="22" cy="22" r="18" class="timer-progress" id="timer-circle"/>
+          </svg>
+          <span class="timer-num" id="timer-num">30</span>
+        </div>
+        <button class="hdr-btn accent" id="btn-skip">Skip ›</button>
+      </div>
+    </header>
+
+    <!-- Dual cam grid -->
+    <div class="cam-grid" id="cam-grid">
+
+      <!-- YOUR CAM -->
+      <div class="cam-panel" id="panel-you">
+        <video id="vid-local" autoplay muted playsinline></video>
+        <canvas id="canvas-local" class="cam-canvas"></canvas>
+
+        <!-- Scan animation overlay (shows while rating) -->
+        <div class="scan-overlay" id="scan-you">
+          <div class="scan-line"></div>
+          <div class="scan-text">Analyzing PSL...</div>
+          <div class="scan-grid"></div>
+        </div>
+
+        <!-- Results overlay -->
+        <div class="cam-results" id="results-you">
+          <div class="res-top">
+            <span class="cam-who-label">YOU</span>
+          </div>
+          <div class="res-bottom">
+            <div class="res-score-row">
+              <span class="res-score" id="score-you">—</span>
+              <span class="res-tier" id="tier-you">Not rated</span>
+            </div>
+            <div class="res-bar-wrap">
+              <div class="res-bar-track">
+                <div class="res-bar-fill" id="bar-you"></div>
+              </div>
+              <div class="res-ticks">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPPONENT CAM -->
+      <div class="cam-panel" id="panel-opp">
+        <video id="vid-remote" autoplay playsinline></video>
+        <canvas id="canvas-remote" class="cam-canvas"></canvas>
+
+        <!-- Waiting state -->
+        <div class="waiting-panel" id="waiting-panel">
+          <div class="waiting-spinner"></div>
+          <p class="waiting-text" id="waiting-text">Finding opponent...</p>
+          <p class="waiting-sub">Make sure both devices are on the same network or use a public URL</p>
+        </div>
+
+        <!-- Scan animation overlay -->
+        <div class="scan-overlay" id="scan-opp">
+          <div class="scan-line"></div>
+          <div class="scan-text">Analyzing PSL...</div>
+          <div class="scan-grid"></div>
+        </div>
+
+        <!-- Results overlay -->
+        <div class="cam-results" id="results-opp">
+          <div class="res-top">
+            <span class="cam-who-label">OPPONENT</span>
+          </div>
+          <div class="res-bottom">
+            <div class="res-score-row">
+              <span class="res-score" id="score-opp">—</span>
+              <span class="res-tier" id="tier-opp">Waiting...</span>
+            </div>
+            <div class="res-bar-wrap">
+              <div class="res-bar-track">
+                <div class="res-bar-fill" id="bar-opp"></div>
+              </div>
+              <div class="res-ticks">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Verdict strip -->
+    <div class="verdict-strip" id="verdict-strip">
+      <div class="verdict-content" id="verdict-content">
+        <span id="verdict-emoji">⚖️</span>
+        <span id="verdict-text">—</span>
+      </div>
+    </div>
+
+    <!-- Debug / connection info bar -->
+    <div class="debug-bar" id="debug-bar">
+      <span id="debug-text">Waiting for connection...</span>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SOLO RATE SCREEN
+  ════════════════════════════════════════════════════ -->
+  <div id="screen-solo" class="screen">
+    <header class="arena-header">
+      <button class="hdr-btn" id="btn-back-from-solo">← Back</button>
+      <div class="hdr-center">
+        <span class="logo-text-sm">SOLO RATING</span>
+      </div>
+      <div class="hdr-right"></div>
+    </header>
+
+    <div class="solo-layout">
+      <div class="solo-cam-wrap">
+        <video id="vid-solo" autoplay muted playsinline></video>
+        <canvas id="canvas-solo" class="cam-canvas"></canvas>
+        <div class="scan-overlay" id="scan-solo">
+          <div class="scan-line"></div>
+          <div class="scan-text">Analyzing PSL...</div>
+          <div class="scan-grid"></div>
+        </div>
+      </div>
+
+      <div class="solo-panel">
+        <div class="solo-score-display">
+          <div class="solo-score-big" id="solo-score-big">—</div>
+          <div class="solo-tier-label" id="solo-tier-label">Press Scan to rate yourself</div>
+        </div>
+
+        <div class="solo-bar-wrap">
+          <div class="solo-bar-track">
+            <div class="solo-bar-fill" id="solo-bar-fill"></div>
+          </div>
+          <div class="solo-ticks">
+            <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+            <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+          </div>
+        </div>
+
+        <div class="solo-tier-breakdown" id="solo-tier-breakdown">
+          <!-- filled by JS -->
+        </div>
+
+        <button class="btn-primary solo-scan-btn" id="btn-solo-scan">
+          <span class="btn-icon">🔍</span>
+          <span>Scan My Face</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-solo-leaderboard">🏆 Submit to Leaderboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       LEADERBOARD MODAL
+  ════════════════════════════════════════════════════ -->
+  <div id="modal-leaderboard" class="modal hidden">
+    <div class="modal-backdrop" id="lb-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-title">🏆 Global Leaderboard</h2>
+        <button class="modal-close" id="btn-close-leaderboard">✕</button>
+      </div>
+
+      <div class="lb-tabs">
+        <button class="lb-tab active" data-tab="top">Top Scores</button>
+        <button class="lb-tab" data-tab="recent">Recent</button>
+        <button class="lb-tab" data-tab="tiers">By Tier</button>
+      </div>
+
+      <div class="lb-body" id="lb-body">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="lb-submit-form" id="lb-submit-form">
+        <input type="text" class="lb-name-input" id="lb-name-input" placeholder="Enter your name to submit score..." maxlength="20" />
+        <button class="btn-primary lb-submit-btn" id="btn-lb-submit">Submit Score</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       NAME PROMPT MODAL
+  ════════════════════════════════════════════════════ -->
+  <div id="modal-name" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-box-sm">
+      <h2 class="modal-title">Submit Your Score</h2>
+      <p class="modal-sub">Enter a name to appear on the leaderboard</p>
+      <input type="text" class="lb-name-input" id="name-prompt-input" placeholder="Your name..." maxlength="20" />
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btn-name-cancel">Cancel</button>
+        <button class="btn-primary" id="btn-name-confirm">Submit →</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
